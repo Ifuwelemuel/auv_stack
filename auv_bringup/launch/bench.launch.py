@@ -9,6 +9,15 @@ from launch.substitutions import PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
+from launch.conditions import IfCondition
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+
+
+use_local_joy = DeclareLaunchArgument(
+        'use_local_joy', default_value='false',
+        description='Run joy_node locally. Set false when joy comes from '
+                    'the buoy Pi over the wired link.')
 
 def generate_launch_description():
     pkg_control = FindPackageShare('auv_control')
@@ -22,7 +31,8 @@ def generate_launch_description():
                      [pkg_control, 'config', 'mixer_params.yaml'])])
 
     joy = Node(package='joy', executable='joy_node', name='joy_node',
-               output='screen')
+               output='screen',
+               condition=IfCondition(LaunchConfiguration('use_local_joy')))
 
     teleop = Node(package='auv_control', executable='teleop_node',
                   name='teleop_node', output='screen',

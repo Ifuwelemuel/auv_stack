@@ -22,10 +22,16 @@ OUTDRV = 0x04
 class PCA9685:
     """Minimal PCA9685 driver over smbus2, with read-back verification."""
 
-    def __init__(self, bus_num, addr, freq_hz=50):
+    def __init__(self, bus_num, addr, freq_hz=50, osc_hz=25_000_000):
         self._bus = SMBus(bus_num)
         self._addr = addr
         self._freq = freq_hz
+        # ADR-020: the internal oscillator deviates per board (this one runs
+        # ~15% fast). Prescale MUST derive from the measured value or every
+        # pulse width is silently scaled. Default stays nominal so the class
+        # is honest on an unmeasured board.
+        self._osc = osc_hz
+        self._prescale = int(round(self._osc / (4096.0 * self._freq)) - 1)
         self.init()
 
     # --- low-level register access -------------------------------------- #
@@ -45,10 +51,9 @@ class PCA9685:
         time.sleep(0.005)
         self._w(MODE1, self._r(MODE1) & ~SLEEP)      # wake
         time.sleep(0.005)
-        prescale = int(round(25_000_000.0 / (4096.0 * self._freq)) - 1)
         old = self._r(MODE1)
         self._w(MODE1, (old & 0x7F) | SLEEP)          # sleep to set prescale
-        self._w(PRESCALE, prescale)
+        self._w(PRESCALE, self._prescale)             # ADR-020: from measured osc
         self._w(MODE1, old)                            # restore (wakes)
         time.sleep(0.005)
         self._w(MODE1, old | RESTART | AI)             # restart + auto-inc
@@ -60,7 +65,7 @@ class PCA9685:
         This exists because a failed init is SILENT: the chip stays asleep at
         its default frequency, every subsequent write appears to succeed, and
         the actuators simply never move."""
-        want = int(round(25_000_000.0 / (4096.0 * self._freq)) - 1)
+        want = self._prescale          # same single source of truth init() wrote
         try:
             got = self._r(PRESCALE)
             mode1 = self._r(MODE1)
@@ -71,7 +76,9 @@ class PCA9685:
 
     # --- output ----------------------------------------------------------- #
     def set_us(self, channel, microseconds):
-        """Set one channel's pulse width in microseconds."""
+        """Set one channel's pulse width in microseconds. Once the prescale
+        makes a tick truly 1/(freq*4096) s, this maths is correct as written
+        — no per-value scaling anywhere (ADR-020)."""
         ticks = int(4096 * microseconds / (1_000_000.0 / self._freq))
         ticks = max(0, min(4095, ticks))
         base = LED0_ON_L + 4 * channel
@@ -92,6 +99,11 @@ class PCA9685Driver(Node):
         # --- I2C / board -------------------------------------------------- #
         self.declare_parameter('i2c_bus', 7)
         self.declare_parameter('i2c_addr', 0x40)
+        # ADR-020: measured externally (Arduino pulseIn). Board-specific.
+        # Deliberately defaults to NOMINAL: an unconfigured board should fail
+        # obviously on the bench (ESC won't arm), not half-work with a stale
+        # calibration inherited from a previous board.
+        self.declare_parameter('oscillator_hz', 25_000_000)
 
         # --- Channel map (ADR-012) --------------------------------------- #
         self.declare_parameter('pitch_channel', 0)
@@ -103,6 +115,8 @@ class PCA9685Driver(Node):
         # neutral and span are measured and stored separately. Do NOT assume
         # the two axes match. Commanding past a stop stalls the servo, which
         # draws full current and can strip gears.
+        # WARNING (ADR-020): stored fin values were measured through the OLD
+        # board's oscillator and are STALE — re-walk before driving fins.
         self.declare_parameter('pitch_centre_us', 825)
         self.declare_parameter('pitch_span_us', 325)
         self.declare_parameter('yaw_centre_us', 825)
@@ -118,15 +132,17 @@ class PCA9685Driver(Node):
 
         # --- Thruster / ESC ---------------------------------------------- #
         # Marine ESC convention: neutral = stop, bidirectional. Neutral is
-        # MEASURED (ADR-016) — the nominal 1500us read as a small throttle on
-        # this board, preventing arming and causing the motor to creep.
-        self.declare_parameter('thruster_stop_us', 1480)
+        # NOMINAL until the creep-walk on the CURRENT board+ESC pair measures
+        # the true value (ADR-020 supersedes the numbers in ADR-016 — the
+        # old 1480us was measured through the old board's broken timing).
+        self.declare_parameter('thruster_stop_us', 1500)
         self.declare_parameter('thruster_span_us', 200)
         self.declare_parameter('esc_arm_hold_s', 2.0)
 
         p = self.get_parameter
         self._bus_num = p('i2c_bus').value
         self._addr = p('i2c_addr').value
+        self._osc_hz = p('oscillator_hz').value
         self._ch_pitch = p('pitch_channel').value
         self._ch_yaw = p('yaw_channel').value
         self._ch_thr = p('thruster_channel').value
@@ -143,9 +159,12 @@ class PCA9685Driver(Node):
 
         # --- Hardware bring-up ------------------------------------------- #
         try:
-            self._pca = PCA9685(self._bus_num, self._addr)
+            # THE line the calibration rides on: osc_hz must be passed here,
+            # or the parameter is decoration and the board runs mis-scaled.
+            self._pca = PCA9685(self._bus_num, self._addr, osc_hz=self._osc_hz)
             self.get_logger().info(
-                f'PCA9685 opened on i2c-{self._bus_num} @ 0x{self._addr:02x}')
+                f'PCA9685 opened on i2c-{self._bus_num} @ 0x{self._addr:02x}, '
+                f'oscillator={self._osc_hz/1e6:.2f} MHz (ADR-020)')
         except Exception as e:
             self.get_logger().error(f'PCA9685 open failed: {e}')
             raise

@@ -2,19 +2,21 @@
   ros__parameters:
     i2c_bus: 7
     i2c_addr: 0x40
+    oscillator_hz: 28730000   # MEASURED 19 Aug 2026, Arduino pulseIn 
+
     pitch_channel: 0
     yaw_channel: 1
-    thruster_channel: 3
+    thruster_channel: 2       # ESC signal wire moved to ch2 this session
 
-
+    
     pitch_centre_us: 825
-    pitch_span_us: 325        # pitch: 500-1150us
-    yaw_centre_us: 825       
-    yaw_span_us: 200          
+    pitch_span_us: 325
+    yaw_centre_us: 825
+    yaw_span_us: 200
 
     fin_max_rad: 0.5
-    pitch_sign: 1             # positive fin_pitch -> higher us -> nose up
-    yaw_sign: 1               # positive fin_yaw -> higher us -> nose left
+    pitch_sign: 1
+    yaw_sign: 1
 
-    thruster_stop_us: 1480    
-    thruster_span_us: 200     # gentle for bench; 400 = full range in water
+    thruster_stop_us: 1500    # nominal until creep-walk measures true neutral
+    thruster_span_us: 200
