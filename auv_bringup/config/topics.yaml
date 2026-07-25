@@ -1,0 +1,12 @@
+# Canonical topic names for the AUV stack. One source of truth.
+# mavros names are what THIS build publishes (see ADR-009), confirmed by
+# `ros2 topic list -t`. If a mavros upgrade renames them, change here only.
+mavros:
+  imu:        /mavros/mavros/data
+  imu_raw:    /mavros/mavros/data_raw
+  mag:        /mavros/mavros/mag
+  compass_hdg: /mavros/mavros/compass_hdg
+  state:      /mavros/state
+  battery:    /mavros/battery
+  # depth (Bar02 via ArduSub) — confirm exact name when sensor is wired:
+  # static_pressure: /mavros/mavros/static_pressure

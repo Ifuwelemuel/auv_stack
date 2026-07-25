@@ -1,0 +1,19 @@
+# Parameters for the mavros node bridging the Pixhawk (ArduSub) to ROS 2.
+# Kept in version control so the bridge config is reproducible on any machine.
+/**:
+  ros__parameters:
+    # ArduPilot's system ID. Default ArduSub is 1; the GCS (mavros) uses 255.
+    system_id: 255
+    component_id: 240
+    target_system_id: 1
+    target_component_id: 1
+
+    # Rate (Hz) at which we request each MAVLink data stream from the autopilot.
+    # Higher = fresher data, more USB bandwidth. 50 Hz IMU is plenty for now.
+    plugin_allowlist:
+      - sys_status
+      - imu
+      - global_position
+      - local_position
+      - rc_io
+      - command

@@ -1,0 +1,6 @@
+/actuator_mixer:
+  ros__parameters:
+    source_timeout_s: 0.3
+    publish_rate_hz: 20.0
+    fin_pitch_limit_rad: 0.5     # ~29 deg; set to your servo's real limit
+    fin_yaw_limit_rad: 0.5

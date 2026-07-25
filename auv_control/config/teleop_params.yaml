@@ -1,0 +1,14 @@
+/teleop_node:
+  ros__parameters:
+    deadman_button: 4       # <-- your LB index
+    estop_button: 1         # <-- your B index
+    clear_button: 3         # <-- your Y index
+    yaw_axis: 0             # <-- your left-stick-horizontal index
+    pitch_axis: 4           # <-- your right-stick-vertical index
+    thrust_axis: 5          # <-- your trigger index
+    ballast_axis: 7         # <-- d-pad vertical, or whichever you chose
+    yaw_scale: 0.5
+    pitch_scale: 0.5
+    thrust_scale: 1.0
+    ballast_scale: 1.0
+    trigger_style_thrust: true    # 

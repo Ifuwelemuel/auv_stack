@@ -1,0 +1,35 @@
+# --- colcon build artefacts -------------------------------------------------
+build/
+install/
+log/
+
+# --- Python bytecode --------------------------------------------------------
+__pycache__/
+*.pyc
+*.egg-info/
+
+# --- ROS bags: datasets, not source -----------------------------------------
+*.mcap
+*.db3
+bags/
+
+# --- Trained models: binary, large, regenerable ------------------------------
+*.pt
+*.onnx
+*.engine
+
+# --- Editor and OS noise -----------------------------------------------------
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+
+
+
+
+
+
+
+

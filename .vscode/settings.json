@@ -1,0 +1,42 @@
+{
+  "files.associations": {
+    "*.msg": "ros.msg",
+    "*.srv": "ros.msg",
+    "*.action": "ros.msg",
+    "*.launch.py": "python",
+    "*.repos": "yaml"
+  },
+  "files.watcherExclude": {
+    "**/build/**": true,
+    "**/install/**": true,
+    "**/log/**": true
+  },
+  "search.exclude": {
+    "**/build": true,
+    "**/install": true,
+    "**/log": true
+  },
+  "python.analysis.extraPaths": [
+    "/opt/ros/humble/lib/python3.10/site-packages"
+  ],
+  "editor.rulers": [99],
+  "editor.trimAutoWhitespace": true,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "[python]": {
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true
+  }
+
+  
+}
+
+{
+  "recommendations": [
+    "ms-iot.vscode-ros",
+    "ms-python.python",
+    "ms-vscode.cpptools",
+    "twxs.cmake",
+    "redhat.vscode-xml"
+  ]
+}
