@@ -29,6 +29,7 @@ setup(
         'console_scripts': [
             'actuator_mixer = auv_control.actuator_mixer:main',
             'teleop_node = auv_control.teleop_node:main',
+            'actuator_driver = auv_control.actuator_driver:main',
         ],
     },
 )
