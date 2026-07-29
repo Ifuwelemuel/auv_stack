@@ -3,4 +3,3 @@
     mission_file: ''      # SET BY LAUNCH ARG — empty here forces the error
     rate_hz: 5.0
     position_timeout_s: 5.0
-    

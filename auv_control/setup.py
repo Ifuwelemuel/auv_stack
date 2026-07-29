@@ -35,6 +35,7 @@ setup(
             'depth_sensor = auv_control.depth_sensor:main',
             'depth_controller = auv_control.depth_controller:main',
             'los_guidance = auv_control.los_guidance:main',
+            'waypoint_manager = auv_control.waypoint_manager:main',
         ],
     },
 )

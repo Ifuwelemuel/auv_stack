@@ -18,6 +18,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 
 
 def generate_launch_description():
@@ -61,6 +62,11 @@ def generate_launch_description():
         'guidance', default_value='false',
         description='Run LOS guidance (publishes /cmd/heading_setpoint from '
                     'GPS + target; the heading controller consumes it unchanged).')
+    
+    mission = DeclareLaunchArgument(
+        'mission', default_value='',
+        description='Path to a mission YAML. Empty = no waypoint manager. '
+                    'Non-empty = the manager launches with that mission.')
 
     # --- Nodes ----------------------------------------------------------------
     safety = Node(package='auv_safety', executable='safety_supervisor',
@@ -108,6 +114,18 @@ def generate_launch_description():
                         parameters=[PathJoinSubstitution(
                             [pkg_control, 'config', 'los_params.yaml'])],
                         condition=IfCondition(LaunchConfiguration('guidance')))
+    
+    
+    waypoint_manager = Node(
+        package='auv_control', executable='waypoint_manager',
+        name='waypoint_manager', output='screen',
+        parameters=[
+            PathJoinSubstitution(
+                [pkg_control, 'config', 'waypoint_params.yaml']),
+            {'mission_file': LaunchConfiguration('mission')},
+        ],
+        condition=IfCondition(PythonExpression(
+            ["'", LaunchConfiguration('mission'), "' != ''"])))
 
     # --- mavros: composed, one command owns the system ------------------------
     mavros_launch = IncludeLaunchDescription(
