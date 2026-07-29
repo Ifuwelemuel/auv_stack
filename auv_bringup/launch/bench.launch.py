@@ -1,26 +1,20 @@
-"""Bring up the full Phase 0 bench stack: sensors, safety, control, teleop.
+"""Full Phase 0 bench stack: safety, control, teleop, PCA9685 actuation.
 
     ros2 launch auv_bringup bench.launch.py
 
-Props OFF. This launches everything except the mavros->hardware actuator
-driver, which comes in Unit 0.6.
+Props OFF. Fins free or with linkages connected (your call once trusted).
+Brings up: safety_supervisor, actuator_mixer, joy, teleop, pca9685_driver.
+mavros is NOT included here — actuation is PCA9685 now (ADR-012). Add mavros
+separately when you need sensors.
 """
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    pkg_bringup = FindPackageShare('auv_bringup')
     pkg_control = FindPackageShare('auv_control')
-
-    mavros = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(PathJoinSubstitution(
-            [pkg_bringup, 'launch', 'mavros.launch.py'])),
-    )
 
     safety = Node(package='auv_safety', executable='safety_supervisor',
                   name='safety_supervisor', output='screen')
@@ -38,4 +32,9 @@ def generate_launch_description():
                   parameters=[PathJoinSubstitution(
                       [pkg_control, 'config', 'teleop_params.yaml'])])
 
-    return LaunchDescription([mavros, safety, mixer, joy, teleop])
+    driver = Node(package='auv_control', executable='pca9685_driver',
+                  name='pca9685_driver', output='screen',
+                  parameters=[PathJoinSubstitution(
+                      [pkg_control, 'config', 'pca9685_params.yaml'])])
+
+    return LaunchDescription([safety, mixer, joy, teleop, driver])

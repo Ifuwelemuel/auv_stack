@@ -4,7 +4,7 @@
   ros__parameters:
     # ArduPilot's system ID. Default ArduSub is 1; the GCS (mavros) uses 255.
     system_id: 255
-    component_id: 240
+    component_id: 1
     target_system_id: 1
     target_component_id: 1
 

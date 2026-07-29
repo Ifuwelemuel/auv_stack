@@ -7,8 +7,8 @@
     pitch_axis: 4           # <-- your right-stick-vertical index
     thrust_axis: 5          # <-- your trigger index
     ballast_axis: 7         # <-- d-pad vertical, or whichever you chose
-    yaw_scale: 0.5
-    pitch_scale: 0.5
+    yaw_scale: -0.5
+    pitch_scale: -0.5
     thrust_scale: 1.0
     ballast_scale: 1.0
     trigger_style_thrust: true    # 
