@@ -7,10 +7,14 @@ import yaml
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 
 from std_msgs.msg import Bool, Header
 from geometry_msgs.msg import Point
+from sensor_msgs.msg import NavSatFix
 from std_srvs.srv import Trigger
+
+from auv_control.local_frame import LocalFrame
 
 
 class WaypointManager(Node):
@@ -27,13 +31,25 @@ class WaypointManager(Node):
             raise RuntimeError('mission_file parameter is required.')
         with open(path) as f:
             m = yaml.safe_load(f)['mission']
-        self._wps = [tuple(w) for w in m['waypoints']]
+
+        frame = m.get('frame')
+        if frame not in ('local', 'global'):
+            raise RuntimeError(
+                f"mission 'frame' must be 'local' or 'global', got: {frame!r}. "
+                f"Ambiguous coordinates are rejected, not guessed (ADR-031).")
+        self._frame_kind = frame
+        self._raw_wps = [tuple(w) for w in m['waypoints']]
+        # local: usable immediately. global: conversion deferred until the
+        # origin arrives (it may not exist yet — born at the first fix).
+        self._wps = self._raw_wps if frame == 'local' else None
+
         self._accept = float(m['acceptance_radius_m'])
         self._timeout = float(m['mission_timeout_s'])
         g = m['geofence']
         self._fence = (g['east_min'], g['east_max'],
                        g['north_min'], g['north_max'])
 
+        self._origin = None
         self._pos = None
         self._last_pos_time = None
         self._idx = None            # None = idle; int = current waypoint
@@ -42,14 +58,27 @@ class WaypointManager(Node):
 
         self.create_subscription(Point, '/guidance/position',
                                  self._on_position, 10)
+
+        # Origin from the frame authority: latched (transient-local) so this
+        # node receives it even if it boots after the origin was born.
+        latched = QoSProfile(depth=1,
+                             reliability=ReliabilityPolicy.RELIABLE,
+                             durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(NavSatFix, '/guidance/origin',
+                                 self._on_origin, latched)
+
         self._target_pub = self.create_publisher(Point, '/guidance/target', 10)
         self._hb_pub = self.create_publisher(Header, '/heartbeat', 10)
         self._estop_pub = self.create_publisher(Bool, '/estop_request', 10)
         self.create_service(Trigger, '~/start_mission', self._on_start)
         self.create_timer(1.0 / p('rate_hz').value, self._on_timer)
 
+        # Boot log must speak the truth of BOTH states: a global mission
+        # has no converted waypoints yet, and len(None) is a crash.
+        wps_desc = (f'{len(self._wps)} waypoints' if self._wps is not None
+                    else f'{len(self._raw_wps)} GLOBAL waypoints (awaiting origin)')
         self.get_logger().info(
-            f'Waypoint manager up. {len(self._wps)} waypoints, '
+            f'Waypoint manager up. {wps_desc}, '
             f'accept={self._accept} m, timeout={self._timeout} s, '
             f'fence={self._fence}. IDLE — call ~/start_mission.')
 
@@ -58,7 +87,26 @@ class WaypointManager(Node):
         self._pos = (msg.x, msg.y)
         self._last_pos_time = self.get_clock().now()
 
+    def _on_origin(self, msg: NavSatFix):
+        if self._origin is not None:
+            return                      # origin is born once; ignore repeats
+        self._origin = (msg.latitude, msg.longitude)
+        if self._frame_kind == 'global':
+            frame = LocalFrame(*self._origin)
+            self._wps = [frame.to_local(lat, lon)
+                         for lat, lon in self._raw_wps]
+            self.get_logger().info(
+                f'Global mission converted: {len(self._wps)} waypoints, '
+                f'first at ({self._wps[0][0]:.1f} E, {self._wps[0][1]:.1f} N) '
+                f'relative to origin.')
+
     def _on_start(self, request, response):
+        # Frame readiness first (global missions may still await the
+        # origin), then position readiness. Both fail closed.
+        if self._wps is None:
+            response.success = False
+            response.message = 'Refused: global mission awaiting origin (no GPS yet).'
+            return response
         if self._pos is None:
             response.success = False
             response.message = 'Refused: no position yet (no GPS origin).'

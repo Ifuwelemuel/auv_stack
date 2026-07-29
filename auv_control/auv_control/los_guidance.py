@@ -4,7 +4,8 @@ import math
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import (qos_profile_sensor_data, QoSProfile,
+                       DurabilityPolicy, ReliabilityPolicy)
 
 from std_msgs.msg import Float32
 from sensor_msgs.msg import NavSatFix
@@ -18,7 +19,7 @@ class LosGuidance(Node):
         super().__init__('los_guidance')
 
         self.declare_parameter('lookahead_m', 5.0)
-        self.declare_parameter('fix_timeout_s', 3.0)   # GPS is 1 Hz-ish; generous
+        self.declare_parameter('fix_timeout_s', 3.0)   # GPS ~1 Hz; generous
         self.declare_parameter('rate_hz', 5.0)
 
         p = self.get_parameter
@@ -34,14 +35,21 @@ class LosGuidance(Node):
 
         self.create_subscription(NavSatFix, '/buoy/fix',
                                  self._on_fix, qos_profile_sensor_data)
-        # Target in LOCAL metres (Point.x=east, y=north). Unit D publishes
-        # this; until then: ros2 topic pub for bench tests.
         self.create_subscription(Point, '/guidance/target',
                                  self._on_target, 10)
+
         self._sp_pub = self.create_publisher(Float32, '/cmd/heading_setpoint', 10)
-        self.create_timer(1.0 / p('rate_hz').value, self._on_timer)
-        
         self._pos_pub = self.create_publisher(Point, '/guidance/position', 10)
+
+        # Origin: published ONCE, latched (transient-local) so any node that
+        # boots later still receives it. QoS must match the subscriber side.
+        latched = QoSProfile(depth=1,
+                             reliability=ReliabilityPolicy.RELIABLE,
+                             durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self._origin_pub = self.create_publisher(NavSatFix, '/guidance/origin',
+                                                 latched)
+
+        self.create_timer(1.0 / p('rate_hz').value, self._on_timer)
 
         self.get_logger().info(
             f'LOS guidance up. lookahead={self._lookahead} m. '
@@ -53,6 +61,14 @@ class LosGuidance(Node):
             return                     # no fix = no data; silence, not guesses
         if self._frame is None:
             self._frame = LocalFrame(msg.latitude, msg.longitude)
+
+            origin_msg = NavSatFix()
+            origin_msg.header.stamp = self.get_clock().now().to_msg()
+            origin_msg.latitude = msg.latitude
+            origin_msg.longitude = msg.longitude
+            origin_msg.status.status = 0
+            self._origin_pub.publish(origin_msg)   # latched: late joiners get it
+
             self.get_logger().info(
                 f'Origin fixed at ({msg.latitude:.6f}, {msg.longitude:.6f}) '
                 f'— local frame (map) is born here (ADR-028).')
@@ -61,8 +77,8 @@ class LosGuidance(Node):
         self._pos_pub.publish(Point(x=self._pos[0], y=self._pos[1], z=0.0))
 
     def _on_target(self, msg: Point):
-        # Segment start = where we are when the target arrives (or the old
-        # target if this is a waypoint advance). Unit D formalises this.
+        # Segment start = the previous target (waypoint advance) or our
+        # position when the first target arrives.
         self._prev_wp = self._target if self._target is not None else self._pos
         self._target = (msg.x, msg.y)
         self.get_logger().info(
@@ -77,7 +93,7 @@ class LosGuidance(Node):
             self.get_logger().warn('GPS stale — guidance muted.',
                                    throttle_duration_sec=5.0)
             return      # silence: heading controller holds last setpoint;
-                        # Unit D's mission timeout is the deeper safety net.
+                        # the mission timeout is the deeper safety net.
 
         # --- LOS core (Fossen): project, lead, aim ----------------------
         px, py = self._prev_wp
@@ -89,16 +105,16 @@ class LosGuidance(Node):
         else:
             ux, uy = vx / seg_len, vy / seg_len    # unit along-track
             dx, dy = self._pos[0] - px, self._pos[1] - py
-            along = dx * ux + dy * uy              # our projection onto the line
+            along = dx * ux + dy * uy              # projection onto the line
             # Aim point: lookahead ahead of the projection, clamped to the
             # segment end so we never aim past the waypoint.
             s = min(along + self._lookahead, seg_len)
             aim = (px + ux * s, py + uy * s)
             bearing = math.atan2(aim[1] - self._pos[1], aim[0] - self._pos[0])
 
-        # ENU bearing: atan2(dN? no —) x=east,y=north: heading measured CCW
-        # from EAST, matching yaw_from_quat's convention. One convention,
-        # both controllers, zero offsets (ADR-028 notes this explicitly).
+        # ENU: x=east, y=north; heading measured CCW from EAST, matching
+        # yaw_from_quat's convention. One convention, both controllers,
+        # zero offsets (ADR-028).
         self._sp_pub.publish(Float32(data=float(bearing)))
 
 

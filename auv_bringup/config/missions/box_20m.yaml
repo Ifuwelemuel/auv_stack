@@ -1,16 +1,14 @@
-# Mission: 20m box. Coordinates in LOCAL metres (east, north) relative to
-# the origin, which is born at the first GPS fix (ADR-028/029).
+
 mission:
-  waypoints:        # [east_m, north_m]
-    - [20.0, 0.0]
-    - [20.0, 20.0]
-    - [0.0, 20.0]
-    - [0.0, 0.0]    # home
+  frame: global
+  waypoints:        # [latitude, longitude]
+    - [53.38110, -1.46980]
+    - [53.38128, -1.46980]
+    - [53.38128, -1.47010]
   acceptance_radius_m: 3.0
   mission_timeout_s: 600.0
-  geofence:         # hard box in local metres; outside = e-stop
-    east_min: -10.0
-    east_max: 40.0
-    north_min: -10.0
-    north_max: 40.0
-
+  geofence:
+    east_min: -60.0
+    east_max: 60.0
+    north_min: -60.0
+    north_max: 60.0
