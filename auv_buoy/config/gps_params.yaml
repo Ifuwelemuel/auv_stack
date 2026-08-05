@@ -1,0 +1,7 @@
+/buoy_gps:
+  ros__parameters:
+    port: /dev/ttyUSB0
+    baud: 9600
+    frame_id: gps_buoy
+    base_accuracy_m: 2.5
+    status_every: 10
