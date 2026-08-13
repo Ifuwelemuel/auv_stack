@@ -2,10 +2,7 @@
 
     ros2 launch auv_bringup bench.launch.py
 
-Props OFF. Fins free or with linkages connected (your call once trusted).
-Brings up: safety_supervisor, actuator_mixer, joy, teleop, pca9685_driver.
-mavros is NOT included here — actuation is PCA9685 now (ADR-012). Add mavros
-separately when you need sensors.
+
 """
 from launch import LaunchDescription
 from launch.substitutions import PathJoinSubstitution
