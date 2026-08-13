@@ -78,6 +78,9 @@ proportional to forward speed.
                     └──────────────────────────┘
 ```
 
+<img width="1385" height="1010" alt="Screenshot 2026-08-13 at 21 49 00" src="https://github.com/user-attachments/assets/05804e76-1392-4b8d-90ff-ef5098a1cd28" />
+
+
 **Design principles enforced throughout:**
 
 - **The mixer is the single command choke point.** Nothing else may publish
