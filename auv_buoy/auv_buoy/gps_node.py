@@ -1,22 +1,5 @@
 """Surface buoy GPS node.
 
-Reads NMEA from a u-blox M8N over a USB-TTL adapter and publishes
-sensor_msgs/NavSatFix. This node is the sole source of the supervision
-signal for the learned dead-reckoning estimator, so two properties matter
-more than anything else:
-
-  1. TIMESTAMP INTEGRITY. Each fix is stamped with the ROS clock at arrival,
-     not with the GPS's own time field. The supervision target is a
-     displacement compared against motion integrated on another machine, so
-     both must share one time domain (disciplined by chrony). Mixing the GPS
-     time base with the system clock would introduce an offset that appears
-     directly as training error.
-
-  2. HONEST UNCERTAINTY. position_covariance is derived from the reported
-     HDOP rather than left at zero, so downstream weighting can distinguish
-     a marginal 3-satellite fix from a clean open-sky one. The training loss
-     is heteroscedastic and depends on this being real.
-
 Published:
     /buoy/fix        sensor_msgs/NavSatFix
     /buoy/gps_status diagnostic string
