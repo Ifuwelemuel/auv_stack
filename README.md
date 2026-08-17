@@ -6,12 +6,16 @@ ROS 2 software stack for a low-cost autonomous underwater vehicle investigating
 MSc dissertation project, Sheffield Hallam University.
 Supervisor: Konstantinos Domdouzis.
 
+> **Status:** Phase 0 complete (bench bring-up, safety architecture, calibrated
+> actuation, buoy GPS and time synchronisation). Phases 1–6 in progress.
+> See [Project phases](#project-phases).
+
 ---
 
 ## Research context
 
 An AUV cannot use GPS while submerged — electromagnetic signals attenuate
-rapidly in water  so it must dead reckon between surfacings. Accuracy
+rapidly in water — so it must dead reckon between surfacings. Accuracy
 conventionally depends on a Doppler Velocity Log (DVL), an acoustic instrument
 that typically costs more than the rest of a low-cost vehicle combined.
 
@@ -34,16 +38,16 @@ itself to be differentiable.
 | Subsystem | Component | Role |
 |---|---|---|
 | Companion computer | NVIDIA Jetson Orin Nano (Super) | All autonomy, control and estimation; ROS 2 host |
-| Autopilot | Pixhawk 2.4.8 running ArduSub 4.7 | Calibrated sensor package only  **not** in the actuation path |
+| Autopilot | Pixhawk 2.4.8 running ArduSub 4.7 | Calibrated sensor package only — **not** in the actuation path (ADR-012) |
 | Inertial / attitude | MPU6000 IMU, IST8310 magnetometer | Attitude, angular rate, heading |
 | Depth | Blue Robotics Bar02 (10 m) | Depth measurement and control feedback |
-| Position (supervision) | u-blox M8N on a surface float | Sparse surface fixes  the sole supervision signal |
+| Position (supervision) | u-blox M8N on a surface float | Sparse surface fixes — the sole supervision signal |
 | Propulsion | Blue Robotics T200 + ESC | Bidirectional thrust |
-| Control surfaces | 2 × 25 kg-cm digital servos | Pitch and yaw fins |
-| Ballast | DC motor via BTS7960 H-bridge | Variable buoyancy trim (Jetson GPIO) |
+| Control surfaces | 2 × 25 kg·cm digital servos | Pitch and yaw fins |
+| Ballast | DC motor via BTS7960 H-bridge | Variable buoyancy trim (Jetson GPIO, ADR-004) |
 | Actuation interface | PCA9685 16-channel PWM (I²C) | Deterministic hardware PWM generation |
 | Surface buoy | Raspberry Pi 4, Ubuntu Server 22.04 | GPS logging and network gateway |
-| Power | 2 × 4S 5200 mAh LiPo | Propulsion and electronics on **separate** packs |
+| Power | 2 × 4S 5200 mAh LiPo | Propulsion and electronics on **separate** packs (ADR-007) |
 
 **Vehicle configuration:** ~1 m torpedo form, single stern thruster, two
 independent control fins (pitch and yaw), syringe-based variable ballast. The
@@ -54,24 +58,33 @@ proportional to forward speed.
 
 ## Architecture
 
+Two machines share one ROS 2 graph (`ROS_DOMAIN_ID=42`) over a wired tether.
+On the vehicle, command flow is a **fan-in through a single choke point**: three
+command sources are arbitrated by the mixer, whose single output drives the one
+node that touches hardware. The e-stop is a side channel that reaches the mixer
+*and* the driver independently (defence in depth).
+
 ```
-                    ┌──────────────────────────┐
-   surface float    │  Raspberry Pi (auv-buoy) │
-                    │  GPS node → /buoy/fix    │
-                    │  chrony time reference   │
-                    └────────────┬─────────────┘
-                       Ethernet tether (192.168.10.0/24)
-                    ┌────────────┴─────────────┐
-                    │  Jetson (jetson-desktop) │
-                    │                          │
-   Pixhawk ─UART──▶ │  mavros  (sensors only)  │
-   (ArduSub)        │      ↓                   │
-                    │  safety_supervisor       │  e-stop latch, watchdog
-                    │      ↓                   │
-                    │  actuator_mixer          │  priority arbitration
-                    │      ↓                   │
-                    │  pca9685_driver ─I²C──▶  │  PCA9685 → servos, ESC
-                    └──────────────────────────┘
+ SURFACE FLOAT                          VEHICLE (Jetson, jetson-desktop)
+┌──────────────────────┐
+│ Raspberry Pi         │               Pixhawk (ArduSub, sensors only)
+│ (auv-buoy)           │                   │ TELEM2 UART
+│                      │                   ▼
+│ gps_node ──────────────/buoy/fix──▶  mavros ──▶ /mavros/mavros/imu/data …
+│ chrony time reference│                   (consumed by estimation, Phase 5)
+└──────────┬───────────┘
+           │ Ethernet tether (192.168.10.0/24)
+           ▼
+   joy_node ─/joy─▶ teleop_node ──/cmd/teleop───┐
+                        │                       │
+                        └────/heartbeat──┐      ▼
+                                         ▼   actuator_mixer ─/cmd/actuators─▶ pca9685_driver ─I²C─▶ PCA9685
+   safety_supervisor ────/cmd/safety────────────▲      ▲                          ▲                (servos, ESC)
+        │                                       │      │                          │
+        └───────────────/estop (latched)────────┴──────┴──────────────────────────┘
+                                                (mixer AND driver each enforce it)
+
+   (Phase 3) waypoint/guidance ──/cmd/autonomy──▶ actuator_mixer
 ```
 
 <img width="1385" height="1010" alt="Screenshot 2026-08-13 at 21 49 00" src="https://github.com/user-attachments/assets/05804e76-1392-4b8d-90ff-ef5098a1cd28" />
@@ -81,7 +94,7 @@ proportional to forward speed.
 
 - **The mixer is the single command choke point.** Nothing else may publish
   actuator commands. Safety, teleoperation and autonomy all feed it and it
-  arbitrates by priority with staleness rejection.
+  arbitrates by priority (safety > teleop > autonomy) with staleness rejection.
 - **Safe state is fail-to-*surface*, not fail-to-off.** A de-powered submerged
   vehicle stays at depth. The safe command is thruster stopped, fins neutral,
   ballast driven to empty.
@@ -97,11 +110,26 @@ proportional to forward speed.
 
 | Package | Build type | Contents |
 |---|---|---|
-| `auv_interfaces` | ament_cmake | Message definitions. The system contract  depends on nothing, everything depends on it. |
-| `auv_safety` | ament_python | `safety_supervisor`  latched e-stop, command watchdog, safe-state publisher |
+| `auv_interfaces` | ament_cmake | Message definitions. The system contract — depends on nothing, everything depends on it. |
+| `auv_safety` | ament_python | `safety_supervisor` — e-stop latch and clear authority, command watchdog, safe-state publisher |
 | `auv_control` | ament_python | `actuator_mixer`, `teleop_node`, `pca9685_driver` |
 | `auv_bringup` | ament_python | Launch files and configuration |
-| `auv_buoy` | ament_python | `gps_node`  NMEA to `sensor_msgs/NavSatFix` with HDOP-derived covariance |
+| `auv_buoy` | ament_python | `gps_node` — NMEA to `sensor_msgs/NavSatFix` with HDOP-derived covariance |
+
+---
+
+## Configuration
+
+All tunable values live in YAML, never in code. Calibration values are
+board-specific (see [Calibration](#calibration)).
+
+| File | Consumed by | Purpose |
+|---|---|---|
+| `auv_control/config/pca9685_params.yaml` | `pca9685_driver` | I²C bus/address, channel map, **measured** servo centres/spans and ESC neutral |
+| `auv_control/config/mixer_params.yaml` | `actuator_mixer` | Source staleness timeout, output rate, fin deflection limits |
+| `auv_control/config/teleop_params.yaml` | `teleop_node` | Gamepad axis/button map, command scaling |
+| `auv_buoy/config/gps_params.yaml` | `gps_node` (on the Pi) | Serial port, baud rate, frame ID |
+| `auv_bringup/config/mavros_params.yaml` | `mavros` | FCU URL (TELEM2 UART @ 921600), plugin selection |
 
 ---
 
@@ -111,17 +139,20 @@ Requires **ROS 2 Humble** on **Ubuntu 22.04**.
 
 ```bash
 mkdir -p ~/auv_ws/src && cd ~/auv_ws/src
-git clone <this-repo> auv_stack
+git clone git@github.com:Ifuwelemuel/auv_stack.git auv_stack
 cd ~/auv_ws
 rosdep install --from-paths src --ignore-src -y
 colcon build --symlink-install
 source install/setup.bash
 ```
 
-Python dependencies not resolvable by rosdep:
+Two Python dependencies (`smbus2`, `pynmea2`) are declared in the relevant
+`package.xml` files with pip-backed rosdep keys, so the `rosdep install` line
+above resolves them. If rosdep cannot resolve them on your platform, install
+per-user — **never** `sudo pip` into the system Python on a Jetson:
 
 ```bash
-sudo pip3 install smbus2 pynmea2
+pip3 install --user smbus2 pynmea2
 ```
 
 **Note:** each terminal must `source install/setup.bash` separately.
@@ -136,9 +167,8 @@ sudo pip3 install smbus2 pynmea2
 ros2 launch auv_bringup bench.launch.py
 ```
 
-Brings up the safety supervisor, mixer, teleoperation and PCA9685 driver.
-Add `use_local_joy:=false` when the gamepad is connected to the buoy Pi rather
-than the vehicle.
+Brings up the safety supervisor, mixer, joystick driver, teleoperation and the
+PCA9685 driver.
 
 **Before running with actuators connected: propeller off, vehicle secured,
 physical isolation within reach.**
@@ -160,9 +190,15 @@ Publishes `/buoy/fix` into the shared ROS graph.
 Built and verified **before any actuator was driven**. Each mechanism is
 tested individually and re-checked before every field session.
 
+The e-stop follows the **asymmetric-authority principle** used in industrial
+safety systems: stopping is easy, promiscuous and replay-safe; clearing is
+deliberate, fresh and acknowledged.
+
 | Mechanism | Behaviour |
 |---|---|
-| **Latched e-stop** | Boots stopped; must be explicitly cleared. Published with transient-local QoS so a node starting later still receives the current state — start order is not a safety variable. |
+| **Latched e-stop** | Boots stopped. State published with transient-local QoS so a node starting later still receives it — start order is not a safety variable. |
+| **Engage-only stop requests** | `/estop_request` engages the stop from any publisher at any time. A `false` on this topic is ignored and logged: a replayed or latched message can only ever *stop* the vehicle (ADR-019). |
+| **Acknowledged clear** | Clearing is exclusively via the `clear_estop` service (`std_srvs/Trigger`). The call is refused unless a live commander heartbeat is present — the vehicle cannot be made live with nobody in command. |
 | **Command watchdog** | Trips if the commanding authority stops sending heartbeats. Measures silence on the **local** clock, so remote clock skew cannot corrupt watchdog timing. |
 | **Staleness rejection** | The mixer treats any command older than a timeout as absent, so a crashed node's last command cannot persist. |
 | **Deadman gate** | Teleoperated motion requires a button held; releasing commands neutral. |
@@ -179,6 +215,8 @@ Repeated as a pre-launch checklist:
 4. Releasing the deadman returns actuators to neutral
 5. Disconnecting the controller returns actuators to neutral within the timeout
 6. `PCA9685 verified` appears in the driver log (configuration confirmed, not assumed)
+7. A replayed or latched `false` on `/estop_request` is ignored and logged; the vehicle stays stopped
+8. `clear_estop` is refused while no commander heartbeat is present, and succeeds once one is
 
 ---
 
@@ -194,7 +232,7 @@ Two findings drive this:
   drives the servos into their mechanical stops.
 - **PWM board oscillators deviate** (ADR-016). The PCA9685's oscillator differs
   from its nominal 25 MHz by a per-board amount, shifting every pulse width.
-  The ESC neutral had to be measured rather than assumed  the nominal value
+  The ESC neutral had to be measured rather than assumed — the nominal value
   read as a small throttle command, preventing arming and causing the motor to
   creep.
 
@@ -256,10 +294,11 @@ alternatives considered, and the consequences. Notable entries:
 | 007 | Split power domains: propulsion and electronics on separate packs, eliminating brownout by topology rather than mitigation |
 | 010 | NVIDIA L4T packages held; never updated via apt |
 | 011 | mavros command and override paths found non-functional on this autopilot combination |
-| 012 | Actuation moved to the companion computer with a dedicated PWM generator |
+| 012 | Actuation moved to the companion computer with a dedicated PWM generator; ArduSub excluded from the actuation path entirely |
 | 013 | Measured, non-standard servo ranges, per axis |
 | 016 | Measured ESC neutral; PWM board oscillator deviation |
 | 018 | Time synchronisation architecture |
+| 019 | E-stop clear authority: engage via topic, clear only via acknowledged service |
 
 ---
 
@@ -287,6 +326,11 @@ No field work commences until both are signed and the pre-launch checklist has
 been completed for that session.
 
 ---
+
+## Licence
+
+MIT. See `LICENSE`.
+
 
 ## Licence
 
