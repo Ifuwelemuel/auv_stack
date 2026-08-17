@@ -6,16 +6,12 @@ ROS 2 software stack for a low-cost autonomous underwater vehicle investigating
 MSc dissertation project, Sheffield Hallam University.
 Supervisor: Konstantinos Domdouzis.
 
-> **Status:** Phase 0 complete (bench bring-up, safety architecture, calibrated
-> actuation, buoy GPS and time synchronisation). Phases 1–6 in progress.
-> See [Project phases](#project-phases).
-
 ---
 
 ## Research context
 
 An AUV cannot use GPS while submerged — electromagnetic signals attenuate
-rapidly in water — so it must dead reckon between surfacings. Accuracy
+rapidly in water  so it must dead reckon between surfacings. Accuracy
 conventionally depends on a Doppler Velocity Log (DVL), an acoustic instrument
 that typically costs more than the rest of a low-cost vehicle combined.
 
@@ -38,16 +34,16 @@ itself to be differentiable.
 | Subsystem | Component | Role |
 |---|---|---|
 | Companion computer | NVIDIA Jetson Orin Nano (Super) | All autonomy, control and estimation; ROS 2 host |
-| Autopilot | Pixhawk 2.4.8 running ArduSub 4.7 | Calibrated sensor package only — **not** in the actuation path (ADR-012) |
+| Autopilot | Pixhawk 2.4.8 running ArduSub 4.7 | Calibrated sensor package only  **not** in the actuation path |
 | Inertial / attitude | MPU6000 IMU, IST8310 magnetometer | Attitude, angular rate, heading |
 | Depth | Blue Robotics Bar02 (10 m) | Depth measurement and control feedback |
-| Position (supervision) | u-blox M8N on a surface float | Sparse surface fixes — the sole supervision signal |
+| Position (supervision) | u-blox M8N on a surface float | Sparse surface fixes  the sole supervision signal |
 | Propulsion | Blue Robotics T200 + ESC | Bidirectional thrust |
 | Control surfaces | 2 × 25 kg-cm digital servos | Pitch and yaw fins |
-| Ballast | DC motor via BTS7960 H-bridge | Variable buoyancy trim (Jetson GPIO, ADR-004) |
+| Ballast | DC motor via BTS7960 H-bridge | Variable buoyancy trim (Jetson GPIO) |
 | Actuation interface | PCA9685 16-channel PWM (I²C) | Deterministic hardware PWM generation |
 | Surface buoy | Raspberry Pi 4, Ubuntu Server 22.04 | GPS logging and network gateway |
-| Power | 2 × 4S 5200 mAh LiPo | Propulsion and electronics on **separate** packs (ADR-007) |
+| Power | 2 × 4S 5200 mAh LiPo | Propulsion and electronics on **separate** packs |
 
 **Vehicle configuration:** ~1 m torpedo form, single stern thruster, two
 independent control fins (pitch and yaw), syringe-based variable ballast. The
@@ -101,11 +97,11 @@ proportional to forward speed.
 
 | Package | Build type | Contents |
 |---|---|---|
-| `auv_interfaces` | ament_cmake | Message definitions. The system contract — depends on nothing, everything depends on it. |
-| `auv_safety` | ament_python | `safety_supervisor` — latched e-stop, command watchdog, safe-state publisher |
+| `auv_interfaces` | ament_cmake | Message definitions. The system contract  depends on nothing, everything depends on it. |
+| `auv_safety` | ament_python | `safety_supervisor`  latched e-stop, command watchdog, safe-state publisher |
 | `auv_control` | ament_python | `actuator_mixer`, `teleop_node`, `pca9685_driver` |
 | `auv_bringup` | ament_python | Launch files and configuration |
-| `auv_buoy` | ament_python | `gps_node` — NMEA to `sensor_msgs/NavSatFix` with HDOP-derived covariance |
+| `auv_buoy` | ament_python | `gps_node`  NMEA to `sensor_msgs/NavSatFix` with HDOP-derived covariance |
 
 ---
 
@@ -198,7 +194,7 @@ Two findings drive this:
   drives the servos into their mechanical stops.
 - **PWM board oscillators deviate** (ADR-016). The PCA9685's oscillator differs
   from its nominal 25 MHz by a per-board amount, shifting every pulse width.
-  The ESC neutral had to be measured rather than assumed — the nominal value
+  The ESC neutral had to be measured rather than assumed  the nominal value
   read as a small throttle command, preventing arming and causing the motor to
   creep.
 
