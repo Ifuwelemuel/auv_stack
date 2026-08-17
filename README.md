@@ -319,6 +319,4 @@ alternatives considered, and the consequences. Notable entries:
 MIT. See `LICENSE`.
 
 
-## Licence
 
-MIT. See `LICENSE`.
