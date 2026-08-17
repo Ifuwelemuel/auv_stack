@@ -6,16 +6,12 @@ ROS 2 software stack for a low-cost autonomous underwater vehicle investigating
 MSc dissertation project, Sheffield Hallam University.
 Supervisor: Konstantinos Domdouzis.
 
-> **Status:** Phase 0 complete (bench bring-up, safety architecture, calibrated
-> actuation, buoy GPS and time synchronisation). Phases 1–6 in progress.
-> See [Project phases](#project-phases).
-
 ---
 
 ## Research context
 
-An AUV cannot use GPS while submerged — electromagnetic signals attenuate
-rapidly in water — so it must dead reckon between surfacings. Accuracy
+An AUV cannot use GPS while submerged  electromagnetic signals attenuate
+rapidly in water  so it must dead reckon between surfacings. Accuracy
 conventionally depends on a Doppler Velocity Log (DVL), an acoustic instrument
 that typically costs more than the rest of a low-cost vehicle combined.
 
@@ -38,10 +34,10 @@ itself to be differentiable.
 | Subsystem | Component | Role |
 |---|---|---|
 | Companion computer | NVIDIA Jetson Orin Nano (Super) | All autonomy, control and estimation; ROS 2 host |
-| Autopilot | Pixhawk 2.4.8 running ArduSub 4.7 | Calibrated sensor package only — **not** in the actuation path (ADR-012) |
+| Autopilot | Pixhawk 2.4.8 running ArduSub 4.7 | Calibrated sensor package only  **not** in the actuation path (ADR-012) |
 | Inertial / attitude | MPU6000 IMU, IST8310 magnetometer | Attitude, angular rate, heading |
 | Depth | Blue Robotics Bar02 (10 m) | Depth measurement and control feedback |
-| Position (supervision) | u-blox M8N on a surface float | Sparse surface fixes — the sole supervision signal |
+| Position (supervision) | u-blox M8N on a surface float | Sparse surface fixes  the sole supervision signal |
 | Propulsion | Blue Robotics T200 + ESC | Bidirectional thrust |
 | Control surfaces | 2 × 25 kg·cm digital servos | Pitch and yaw fins |
 | Ballast | DC motor via BTS7960 H-bridge | Variable buoyancy trim (Jetson GPIO, ADR-004) |
@@ -110,11 +106,11 @@ node that touches hardware. The e-stop is a side channel that reaches the mixer
 
 | Package | Build type | Contents |
 |---|---|---|
-| `auv_interfaces` | ament_cmake | Message definitions. The system contract — depends on nothing, everything depends on it. |
-| `auv_safety` | ament_python | `safety_supervisor` — e-stop latch and clear authority, command watchdog, safe-state publisher |
+| `auv_interfaces` | ament_cmake | Message definitions. |
+| `auv_safety` | ament_python | `safety_supervisor`  e-stop latch and clear authority, command watchdog, safe-state publisher |
 | `auv_control` | ament_python | `actuator_mixer`, `teleop_node`, `pca9685_driver` |
 | `auv_bringup` | ament_python | Launch files and configuration |
-| `auv_buoy` | ament_python | `gps_node` — NMEA to `sensor_msgs/NavSatFix` with HDOP-derived covariance |
+| `auv_buoy` | ament_python | `gps_node`  NMEA to `sensor_msgs/NavSatFix` with HDOP-derived covariance |
 
 ---
 
@@ -307,25 +303,16 @@ alternatives considered, and the consequences. Notable entries:
 | Phase | Content | Status |
 |---|---|---|
 | 0 | Bench bring-up: software skeleton, sensor bridge, safety architecture, actuation, teleoperation | Complete |
-| 1 | Vehicle model, coordinate-frame tree, lightweight dynamics simulation | In progress |
-| 2 | Heading and depth control | Planned |
-| 3 | Surface autonomy: guidance law and waypoint missions | Planned |
-| 4 | Field data campaign: synchronised multi-machine dataset | Planned |
-| 5 | Learned dead-reckoning model, training pipeline, evaluation harness | Planned |
-| 6 | Onboard deployment, final trials, artefacts | Planned |
+| 1 | Vehicle model, coordinate-frame tree, lightweight dynamics simulation | |
+| 2 | Heading and depth control |  |
+| 3 | Surface autonomy: guidance law and waypoint missions |  |
+| 4 | Field data campaign: synchronised multi-machine dataset |  |
+| 5 | Learned dead-reckoning model, training pipeline, evaluation harness |  |
+| 6 | Onboard deployment, final trials, artefacts |  |
 
 ---
 
-## Governance
 
-The research involves no human participants, no personal data and no human
-tissue, and was reviewed under the University's UREC 1 procedure. A health and
-safety risk assessment covering water entry, lithium-polymer battery hazards,
-the powered thruster, loss of the vehicle and lone working has been approved.
-No field work commences until both are signed and the pre-launch checklist has
-been completed for that session.
-
----
 
 ## Licence
 
