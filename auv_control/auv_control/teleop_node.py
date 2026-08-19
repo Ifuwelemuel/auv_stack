@@ -128,9 +128,7 @@ class TeleopNode(Node):
                 cmd.thruster = (1.0 - raw_thrust) / 2.0 * self._s_thrust
             else:
                 cmd.thruster = raw_thrust * self._s_thrust
-        # else: all fields remain 0.0 — deadman released = neutral.
-
-        self._cmd_pub.publish(cmd)
+            self._cmd_pub.publish(cmd)
 
     @staticmethod
     def _axis(msg, i):
