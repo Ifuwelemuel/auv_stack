@@ -17,3 +17,5 @@
       - local_position
       - rc_io
       - command
+
+    fcu_url: /dev/pixhawk:115200

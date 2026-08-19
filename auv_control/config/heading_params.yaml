@@ -1,0 +1,10 @@
+/heading_controller:
+  ros__parameters:
+    kp: 0.8
+    ki: 0.0                # OFF until PD is tuned
+    kd: 0.3
+    i_limit: 0.2
+    cruise_thrust: 0.3     # bench-gentle; retune in water
+    rate_hz: 10.0          # matches measured ATTITUDE stream (10 Hz)
+    imu_timeout_s: 0.5
+    imu_topic: /mavros/mavros/data   # mavros 2026.6, ADR-009 note updated

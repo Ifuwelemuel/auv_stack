@@ -20,7 +20,7 @@ def generate_launch_description():
     # We default to the udev symlink; fall back to /dev/ttyACM0 if not yet set.
     fcu_url = DeclareLaunchArgument(
         'fcu_url',
-        default_value='/dev/ttyTHS1:921600',   # UART per ADR-008, was ttyACM0
+        default_value='/dev/pixhawk:115200',   # udev symlink, ADR-022 (supersedes ADR-008)
         description='Flight controller connection URL (device:baud)',
     )
 

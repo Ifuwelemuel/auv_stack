@@ -31,6 +31,7 @@ setup(
             'teleop_node = auv_control.teleop_node:main',
             'actuator_driver = auv_control.actuator_driver:main',
             'pca9685_driver = auv_control.pca9685_driver:main',
+            'heading_controller = auv_control.heading_controller:main',
         ],
     },
 )
