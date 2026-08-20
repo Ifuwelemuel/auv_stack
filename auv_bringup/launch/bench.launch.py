@@ -51,6 +51,11 @@ def generate_launch_description():
         'mavros', default_value='true',
         description='Include the mavros sensor bridge. Set false only for '
                     'actuation-only bench work.')
+    
+    depth_ctrl = DeclareLaunchArgument(
+        'depth_ctrl', default_value='false',
+        description='Run the depth controller (publishes /cmd/pitch; the '
+                    'heading controller composes it into /cmd/autonomy).')
 
     # --- Nodes ----------------------------------------------------------------
     safety = Node(package='auv_safety', executable='safety_supervisor',
@@ -81,11 +86,11 @@ def generate_launch_description():
                             [pkg_control, 'config', 'heading_params.yaml'])],
                         condition=IfCondition(LaunchConfiguration('heading')))
 
-    depth_node = Node(package='auv_control', executable='depth_sensor',
-                      name='depth_sensor', output='screen',
-                      parameters=[PathJoinSubstitution(
-                          [pkg_control, 'config', 'depth_params.yaml'])],
-                      condition=IfCondition(LaunchConfiguration('depth')))
+    depth_controller = Node(package='auv_control', executable='depth_controller',
+                            name='depth_controller', output='screen',
+                            parameters=[PathJoinSubstitution(
+                                [pkg_control, 'config', 'depth_ctrl_params.yaml'])],
+                            condition=IfCondition(LaunchConfiguration('depth_ctrl')))
 
     # --- mavros: composed, one command owns the system ------------------------
     mavros_launch = IncludeLaunchDescription(

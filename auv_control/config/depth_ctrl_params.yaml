@@ -1,0 +1,9 @@
+/depth_controller:
+  ros__parameters:
+    kp: 0.6
+    ki: 0.05          # trims out residual buoyancy; its steady state IS the trim error
+    kd: 0.4
+    i_limit: 0.25
+    rate_hz: 10.0
+    depth_timeout_s: 0.7
+    max_depth_m: 2.0  # bench/pool ceiling; raise deliberately per site
