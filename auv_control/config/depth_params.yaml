@@ -1,0 +1,6 @@
+/depth_sensor:
+  ros__parameters:
+    i2c_bus: 1
+    fluid_density: 997.0
+    rate_hz: 10.0
+    max_failures: 5

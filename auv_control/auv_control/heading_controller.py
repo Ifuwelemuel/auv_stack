@@ -29,7 +29,7 @@ class HeadingController(Node):
         super().__init__('heading_controller')
 
         # Gains in parameters, never code: bench tuning is YAML edits +
-        # ros2 param set, not rebuilds.
+    
         self.declare_parameter('kp', 0.8)     # rad fin per rad error
         self.declare_parameter('ki', 0.0)     # OFF until PD is tuned
         self.declare_parameter('kd', 0.3)

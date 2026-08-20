@@ -1,8 +1,10 @@
-"""Full bench stack: safety, control, teleop, PCA9685 actuation, mavros bridge.
+"""Full bench stack: safety, control, teleop, PCA9685 actuation, mavros bridge,
+depth sensing.
 
     ros2 launch auv_bringup bench.launch.py                    # normal bench run
     ros2 launch auv_bringup bench.launch.py record:=true       # + rosbag dataset
     ros2 launch auv_bringup bench.launch.py heading:=true      # + heading controller
+    ros2 launch auv_bringup bench.launch.py depth:=true        # + Bar02 depth node
     ros2 launch auv_bringup bench.launch.py use_local_joy:=false  # joy on buoy Pi
     ros2 launch auv_bringup bench.launch.py mavros:=false      # actuation-only work
 """
@@ -22,13 +24,13 @@ def generate_launch_description():
     pkg_control = FindPackageShare('auv_control')
     pkg_bringup = FindPackageShare('auv_bringup')
 
-    #  Launch arguments 
-    t.
+    # --- Launch arguments ---------------------------------------------------
+    # Each DeclareLaunchArgument: distinct variable, AND listed in the
+    # returned LaunchDescription — the two bugs this file has already had.
     use_local_joy = DeclareLaunchArgument(
         'use_local_joy', default_value='true',
-        description='Run joy_node on this machine. Default TRUE: the normal '
-                    'bench case is the gamepad on the vehicle computer. Set '
-                    'false only when joy comes from the buoy Pi.')
+        description='Run joy_node on this machine. Set false only when joy '
+                    'comes from the buoy Pi.')
 
     record = DeclareLaunchArgument(
         'record', default_value='false',
@@ -37,16 +39,20 @@ def generate_launch_description():
 
     heading = DeclareLaunchArgument(
         'heading', default_value='false',
-        description='Run the heading controller. Opt-in until the loop is '
-                    'tuned: clearing e-stop with this on commands cruise '
-                    'thrust immediately.')
+        description='Run the heading controller. Opt-in: clearing e-stop '
+                    'with this on commands cruise thrust immediately.')
+
+    depth = DeclareLaunchArgument(
+        'depth', default_value='false',
+        description='Run the Bar02 depth sensor node. Opt-in until the '
+                    'stability soak passes; then default can flip true.')
 
     mavros = DeclareLaunchArgument(
         'mavros', default_value='true',
-        description='Include the mavros sensor bridge. Phase 2+ needs IMU; '
-                    'set false only for actuation-only bench work.')
+        description='Include the mavros sensor bridge. Set false only for '
+                    'actuation-only bench work.')
 
-    # Nodes 
+    # --- Nodes ----------------------------------------------------------------
     safety = Node(package='auv_safety', executable='safety_supervisor',
                   name='safety_supervisor', output='screen')
 
@@ -75,27 +81,33 @@ def generate_launch_description():
                             [pkg_control, 'config', 'heading_params.yaml'])],
                         condition=IfCondition(LaunchConfiguration('heading')))
 
-    #  mavros
-    
+    depth_node = Node(package='auv_control', executable='depth_sensor',
+                      name='depth_sensor', output='screen',
+                      parameters=[PathJoinSubstitution(
+                          [pkg_control, 'config', 'depth_params.yaml'])],
+                      condition=IfCondition(LaunchConfiguration('depth')))
+
+    # --- mavros: composed, one command owns the system ------------------------
     mavros_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(PathJoinSubstitution(
             [pkg_bringup, 'launch', 'mavros.launch.py'])),
         condition=IfCondition(LaunchConfiguration('mavros')))
 
-    #  bag recording 
-    
+    # --- Optional bag recording ------------------------------------------------
+    # Explicit topic list, never '-a': the dataset contract is knowing what
+    # is in it. /depth and /pressure join for Unit B and the estimator.
     bag_name = f'bags/bench_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
     recorder = ExecuteProcess(
         cmd=['ros2', 'bag', 'record', '-o', bag_name,
              '/joy', '/cmd/teleop', '/cmd/safety', '/cmd/autonomy',
              '/cmd/actuators', '/cmd/heading_setpoint', '/estop', '/heartbeat',
-             '/mavros/mavros/data'],
+             '/mavros/mavros/data', '/depth', '/pressure'],
         output='screen',
         condition=IfCondition(LaunchConfiguration('record')))
 
     return LaunchDescription([
-        use_local_joy, record, heading, mavros,   # every argument, or it doesn't exist
-        safety, mixer, joy, teleop, driver, heading_ctrl,
+        use_local_joy, record, heading, depth, mavros,   # every argument
+        safety, mixer, joy, teleop, driver, heading_ctrl, depth_node,
         mavros_launch,
         recorder,
     ])
