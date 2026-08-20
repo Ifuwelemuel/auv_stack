@@ -86,6 +86,12 @@ def generate_launch_description():
                             [pkg_control, 'config', 'heading_params.yaml'])],
                         condition=IfCondition(LaunchConfiguration('heading')))
 
+    depth_node = Node(package='auv_control', executable='depth_sensor',
+                      name='depth_sensor', output='screen',
+                      parameters=[PathJoinSubstitution(
+                          [pkg_control, 'config', 'depth_params.yaml'])],
+                      condition=IfCondition(LaunchConfiguration('depth')))
+    
     depth_controller = Node(package='auv_control', executable='depth_controller',
                             name='depth_controller', output='screen',
                             parameters=[PathJoinSubstitution(
@@ -111,8 +117,8 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('record')))
 
     return LaunchDescription([
-        use_local_joy, record, heading, depth, mavros,   # every argument
-        safety, mixer, joy, teleop, driver, heading_ctrl, depth_node,
+        use_local_joy, record, heading, depth, depth_ctrl, mavros,
+        safety, mixer, joy, teleop, driver, heading_ctrl, depth_node, depth_controller,
         mavros_launch,
         recorder,
     ])
