@@ -56,6 +56,11 @@ def generate_launch_description():
         'depth_ctrl', default_value='false',
         description='Run the depth controller (publishes /cmd/pitch; the '
                     'heading controller composes it into /cmd/autonomy).')
+    
+    guidance = DeclareLaunchArgument(
+        'guidance', default_value='false',
+        description='Run LOS guidance (publishes /cmd/heading_setpoint from '
+                    'GPS + target; the heading controller consumes it unchanged).')
 
     # --- Nodes ----------------------------------------------------------------
     safety = Node(package='auv_safety', executable='safety_supervisor',
@@ -97,6 +102,12 @@ def generate_launch_description():
                             parameters=[PathJoinSubstitution(
                                 [pkg_control, 'config', 'depth_ctrl_params.yaml'])],
                             condition=IfCondition(LaunchConfiguration('depth_ctrl')))
+    
+    los_guidance = Node(package='auv_control', executable='los_guidance',
+                        name='los_guidance', output='screen',
+                        parameters=[PathJoinSubstitution(
+                            [pkg_control, 'config', 'los_params.yaml'])],
+                        condition=IfCondition(LaunchConfiguration('guidance')))
 
     # --- mavros: composed, one command owns the system ------------------------
     mavros_launch = IncludeLaunchDescription(
@@ -112,7 +123,10 @@ def generate_launch_description():
         cmd=['ros2', 'bag', 'record', '-o', bag_name,
              '/joy', '/cmd/teleop', '/cmd/safety', '/cmd/autonomy',
              '/cmd/actuators', '/cmd/heading_setpoint', '/estop', '/heartbeat',
-             '/mavros/mavros/data', '/depth', '/pressure'],
+             '/mavros/mavros/data', '/depth', '/pressure',
+             '/cmd/pitch', '/cmd/depth_setpoint',
+             '/buoy/fix', '/guidance/target'], 
+        
         output='screen',
         condition=IfCondition(LaunchConfiguration('record')))
 
@@ -121,4 +135,5 @@ def generate_launch_description():
         safety, mixer, joy, teleop, driver, heading_ctrl, depth_node, depth_controller,
         mavros_launch,
         recorder,
+        los_guidance,guidance,
     ])
