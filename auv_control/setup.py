@@ -34,6 +34,7 @@ setup(
             'heading_controller = auv_control.heading_controller:main',
             'depth_sensor = auv_control.depth_sensor:main',
             'depth_controller = auv_control.depth_controller:main',
+            'los_guidance = auv_control.los_guidance:main',
         ],
     },
 )

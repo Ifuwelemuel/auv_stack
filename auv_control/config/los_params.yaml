@@ -1,0 +1,5 @@
+/los_guidance:
+  ros__parameters:
+    lookahead_m: 5.0      # convergence aggressiveness; tune in water
+    fix_timeout_s: 3.0
+    rate_hz: 5.0
