@@ -40,6 +40,8 @@ class LosGuidance(Node):
                                  self._on_target, 10)
         self._sp_pub = self.create_publisher(Float32, '/cmd/heading_setpoint', 10)
         self.create_timer(1.0 / p('rate_hz').value, self._on_timer)
+        
+        self._pos_pub = self.create_publisher(Point, '/guidance/position', 10)
 
         self.get_logger().info(
             f'LOS guidance up. lookahead={self._lookahead} m. '
@@ -56,6 +58,7 @@ class LosGuidance(Node):
                 f'— local frame (map) is born here (ADR-028).')
         self._pos = self._frame.to_local(msg.latitude, msg.longitude)
         self._last_fix_time = self.get_clock().now()
+        self._pos_pub.publish(Point(x=self._pos[0], y=self._pos[1], z=0.0))
 
     def _on_target(self, msg: Point):
         # Segment start = where we are when the target arrives (or the old
